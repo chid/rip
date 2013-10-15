@@ -49,7 +49,7 @@ class basesite(object):
 			os.mkdir(self.base_dir)
 		self.url = self.sanitize_url(url)
 		# Directory to store images in
-		self.working_dir  = '%s%s%s' % (self.base_dir, os.sep, self.get_dir(self.url))
+		self.working_dir  = '%s%s%s' % (self.base_dir, '/', self.get_dir(self.url))
 		self.max_threads  = MAX_THREADS
 		self.thread_count = 0
 		self.image_count  = 0
@@ -282,7 +282,7 @@ class basesite(object):
 			sys.stderr.write('Go to http://www.pythonware.com/products/pil/ to install PIL\n')
 			sys.stderr.flush()
 			return
-		fields = inp.split(os.sep)
+		fields = inp.split('/')
 		fields.insert(-1, 'thumbs')
 		saveas = os.sep.join(fields)
 		if os.path.exists(saveas): return
