@@ -10,7 +10,7 @@ var SUPPORTED_VIDEO_SITES = [
 	'pornably.com', 'vporn.com', 'seenive.com', 'cliphunter.com',
 	'', 'spankwire.com', 'vk.com', '']
 
-function init() { // Executes when document has loaded
+function init() { // Executes when DOM is ready
 	// Safari is BAD. 
 	// I have to append a blank style element to get the darn thing to refresh
 	// More info: http://stackoverflow.com/questions/3485365
@@ -140,9 +140,10 @@ function refreshRecent() { // Refresh list of "recent rips"
 					.appendTo($li);
 				$('<a />') // SOURCE LINK
 					.css('padding-left', '3px')
+					.css('font-size', '0.9em')
 					.attr('href', rec.url)
 					.attr('target', '_BLANK')
-					.html(truncate(url, 18))
+					.html(truncate(url, 20))
 					.appendTo($li);
 				$ul.append($li);
 			});
@@ -237,7 +238,7 @@ function startRip() { // Start ripping album
 		.slideUp(function() {
 			$statbar.empty()
 				.attr('has_download_link', 'false')
-				.append( $('<img />').attr('src', 'spinner_dark.gif') )
+				.append( $('<img />').attr('src', './images/spinner_dark.gif') )
 				.append( $('<span />').html(' loading...') )
 				.slideDown();
 			var query = getQueryString(true);
@@ -297,6 +298,9 @@ function ripRequestHandler(json) { // Handles rip requests (both 'start' and 'ch
 			.append(err);
 		setProgress(0);
 		enableRipControls();
+		return;
+	}
+	else if ($statbar.html().indexOf('error: ') >= 0) {
 		return;
 	}
 	else if (json.zip && $statbar.attr('has_download_link') === 'false') {
@@ -366,6 +370,44 @@ function ripRequestHandler(json) { // Handles rip requests (both 'start' and 'ch
 		{
 			return; // Already ripped, nothing to see here
 		}
+		// Check for thumbnails
+		if (log.indexOf('thumbnail: (') >= 0) {
+			var thumbnail = log.substr(log.indexOf('thumbnail: (') + 12);
+			thumbnail = thumbnail.substr(0, thumbnail.length - 1);
+			if ($statbar.data('lastThumb') !== thumbnail) {
+				$statbar.data('lastThumb', thumbnail);
+				var $img = $('<img />');
+				$img
+					.hide()
+					.appendTo($(document.body));
+				$img
+					.attr('src', thumbnail)
+					.imagesLoaded(function() {
+						$img
+							.css({
+								'width' : 'auto',
+								'height' : 'auto',
+								'position' : 'absolute',
+								'top'  : $statbar.position().top,
+								'left' : $statbar.position().left + ($statbar.width() / 2) - ($img.width() / 2),
+								'opacity' : '1.0',
+							})
+							.show()
+							.animate({
+								'width'   : '10px',
+								'height'  : '10px',
+								'top'     : $statbar.position().top,
+								'left'    : $statbar.position().left + ($statbar.width() / 2),
+								'opacity' : '0.0',
+							},
+							1000,
+							function() {
+								$img.remove()
+							});
+					});
+			}
+		}
+		
 		if (log.indexOf(' - ') != -1) {
 			log = log.substr(0, log.indexOf(' - '));
 		}
@@ -378,12 +420,11 @@ function ripRequestHandler(json) { // Handles rip requests (both 'start' and 'ch
 			var denom = parseFloat(log.substr(k+1, j));
 			setProgress(num / denom);
 		}
-		
 		if (log !== '') {
 			$statbar.empty();
 			$('<div />')
 				.append( $('<img />')
-						.attr('src', 'spinner_dark.gif')
+						.attr('src', './images/spinner_dark.gif')
 						.css('padding-right', '10px')
 						.css('padding-left', '10px')
 				)
@@ -445,7 +486,9 @@ function setExample(site) {
 		'redditsluts' : 'http://redditsluts.soup.io/tag/Miss_Ginger_Biscuit',
 		'kodiefiles'  : 'http://www.kodiefiles.nl/2010/10/ff-eerder-gezien.html',
 		'gallerydump' : 'http://www.gallery-dump.com/index.php?gid=553056',
-		'fapdu'       : 'http://fapdu.com/cuties-4.view/'
+		'fapdu'       : 'http://fapdu.com/cuties-4.view/',
+		'seenive'     : 'http://seenive.com/u/911429150038953984',
+		'nfsfw'       : 'http://nfsfw.com/gallery/v/Emily%20Ratajkowski',
 	};
 	loadAlbum(dic[site].replace('http://', ''));
 	return false;
@@ -486,7 +529,7 @@ function startVid() {
 	$('#vid_status')
 		.css('text-align', 'center')
 		.empty()
-		.append( $('<img />') .attr('src', 'spinner_dark.gif') )
+		.append( $('<img />') .attr('src', './images/spinner_dark.gif') )
 		.append( $('<span />').html(' loading...') );
 	
 	var query = 'vid.cgi?url=' + encodeURIComponent($('#vid_text').val());
@@ -596,23 +639,36 @@ function over18() {
 	$('#maintable').hide();
 	$('#footer').hide();
 	var $tos = $('<div />')
-		.append( $('<h1 />').html('Warning: This site contains explicit content') )
+		.append( $('<h1 />').html('Warning: This site may contain explicit content') )
 		.addClass('warning')
 		.attr('id', 'maindiv')
-		.css('margin', '20px');
+		.css('margin', '20px')
+		.css('padding-top', '5px');
 		
 	$('<div />')
 		.html(
-			'This website contains adult content and is intended for persons over the age of 18.' +
+			'This website may contain adult content which is not appropriate for persons over the age of 18.' +
 			'<p>' +
 			'By entering this site, you agree to the following terms of use:')
 		.appendTo($tos);
 	
 	$('<ul />') // LIST OF TOS
 		.append( $('<li />').html('I am over eighteen years old') )
-		.append( $('<li />').html('I will not use this site to download illegal material, or to acquire illegal material in any way.') )
-		.append( $('<li />').html('I will report illegal content to the site administrator immediately via reddit or email') )
-		.append( $('<li />').html('I will not hog the resources of this site, and will not rip more than 20 albums per day.') )
+		.append( $('<li />').html('I will not use this site to acquire illegal material in any way. This includes:') )
+		.append( $('<li />').html('<b>"Jailbait"</b> or any sexual content depicting persons under the age of 18 (including non-nude)').css('margin-left', '20px') )
+		.append( $('<li />').html('<b>Beastiality</b>').css('margin-left', '20px') )
+		.append( $('<li />').html('<b>Incest</b> (even implied)').css('margin-left', '20px') )
+		.append( $('<li />').html('<b>Copyrighted content</b>').css('margin-left', '20px') )
+		.append( $('<li />').html('<b>Gore/violent imagery</b> intended to shock or disturb').css('margin-left', '20px') )
+		.append( $('<li />').html('I will report illegal content found on the site immediately') )
+		.append( $('<li />').html('Each album has a <b class="red">report</b> button').css('margin-left', '20px') )
+		.append( $('<li />').html('I will not rip more than 20 albums per day.') )
+		.append( $('<li />').html('I am aware that the albums I rip are visible to others.') )
+		.appendTo($tos);
+
+	$('<div />')
+		.html('<b>Failure to follow the above rules will result in a ban</b>')
+		.css('margin-bottom', '20px')
 		.appendTo($tos);
 
 	$('<input />') // AGREE
@@ -646,8 +702,7 @@ function i_agree() {
 function loadUserRips() {
 	$.getJSON('rip.cgi?byuser=me', function(json) {
 		if (json.albums && json.albums.length > 0) {
-			var $userrips = $('#user_rips_td')
-				.css('margin-top', '30px');
+			var $userrips = $('#user_rips_td').empty();
 			var $ol = $('<ol />');
 			$.each(json.albums, function(i, rip) {
 				$('<li />')
@@ -675,7 +730,7 @@ function loadUserRips() {
 						{ queue: false, duration: 750 }
 				);
 
-			if (json.albums.length > MAX_USER_ALBUMS) {
+			if (json.albums.length > MAX_USER_ALBUMS && false) {
 				$('#rip_text').hide();
 				$('#rip_button').hide();
 				$('#rip_cached').hide();
@@ -708,6 +763,26 @@ function loadUserRips() {
 	});
 }
 
-// Call initialization function after entire JS file is parsed
-$(window).load(init);
+$.fn.imagesLoaded = function(callback, fireOne) {
+	var
+		args = arguments,
+		elems = this.filter('img'),
+		elemsLen = elems.length - 1;
 
+	elems
+		.bind('load', function(e) {
+			if (fireOne) {
+				!elemsLen-- && callback.call(elems, e);
+			} else {
+				callback.call(this, e);
+			}
+		}).each(function() {
+			// cached images don't fire load sometimes, so we reset src.
+			if (this.complete || this.complete === undefined){
+				this.src = this.src;
+			}
+		});
+}
+
+// Call initialization function after entire JS file is parsed
+$(document).ready(init);

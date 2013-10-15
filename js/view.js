@@ -62,19 +62,24 @@ function loadAlbum(album, start, count, startOver) {
 			if (album.images.length == 0) {
 				// Album not found
 				$('#status_area').hide();
+				$('#thumbs_table').hide()
 				$('#thumbs_area')
-					.css('text-align', 'center')
+					.css({
+						'text-align': 'center',
+						'padding': '30px',
+						'padding-top': '20px'
+					})
 					.append($('<h1 />').html('album not found'))
 					.append($('<div />').html('this album (' + window.location.hash.replace('#','') + ') is no longer available'))
-					.css('padding-bottom', '30px')
-					.show();
+					.slideDown();
 				if (album.guess != null && album.guess != '') {
 					$('#thumbs_area').append(
 						$('<div />')
 							.html('the album may have originated from:')
+							.css('padding-top', '10px')
 							.append( 
 								$('<div />')
-									.css('margin-top', '10px')
+									.css('margin-top', '20px')
 									.append(
 										$('<a />')
 											.addClass('download_box')
@@ -300,7 +305,7 @@ function loadAllAlbums(after, startOver) {
 					.append( $('<td />')
 						.addClass('all_album_title')
 						.attr('colspan', ALBUM_PREVIEW_IMAGE_BREAKS)
-						.html(album.album + ' (' + album.total + ' images)')
+						.html(truncate(album.album, 12) + ' (' + album.total + ' images)')
 					)
 					.appendTo($imgtable);
 				
@@ -648,23 +653,36 @@ function over18() {
 	$('#maintable').hide();
 	$('#albums_table').attr('loading', 'true');
 	var $tos = $('<div />')
-		.append( $('<h1 />').html('Warning: This site contains explicit content') )
+		.append( $('<h1 />').html('Warning: This site may contain explicit content') )
 		.addClass('warning')
 		.attr('id', 'maindiv')
-		.css('margin', '20px');
+		.css('margin', '20px')
+		.css('padding-top', '5px');
 		
 	$('<div />')
 		.html(
-			'This website contains adult content and is intended for persons over the age of 18.' +
+			'This website may contain adult content which is not appropriate for persons over the age of 18.' +
 			'<p>' +
 			'By entering this site, you agree to the following terms of use:')
 		.appendTo($tos);
 	
 	$('<ul />') // LIST OF TOS
 		.append( $('<li />').html('I am over eighteen years old') )
-		.append( $('<li />').html('I will not use this site to download illegal material, or to acquire illegal material in any way.') )
-		.append( $('<li />').html('I will report illegal content to the site administrator immediately via reddit or email') )
-		.append( $('<li />').html('I will not hog the resources of this site, and will not rip more than 20 albums per day.') )
+		.append( $('<li />').html('I will not use this site to acquire illegal material in any way. This includes:') )
+		.append( $('<li />').html('<b>"Jailbait"</b> or any sexual content depicting persons under the age of 18 (including non-nude)').css('margin-left', '20px') )
+		.append( $('<li />').html('<b>Beastiality</b>').css('margin-left', '20px') )
+		.append( $('<li />').html('<b>Incest</b> (even implied)').css('margin-left', '20px') )
+		.append( $('<li />').html('<b>Copyrighted content</b>').css('margin-left', '20px') )
+		.append( $('<li />').html('<b>Gore/violent imagery</b> intended to shock or disturb').css('margin-left', '20px') )
+		.append( $('<li />').html('I will report illegal content found on the site immediately') )
+		.append( $('<li />').html('Each album has a <b class="red">report</b> button').css('margin-left', '20px') )
+		.append( $('<li />').html('I will not rip more than 20 albums per day.') )
+		.append( $('<li />').html('I am aware that the albums I rip are visible to others.') )
+		.appendTo($tos);
+
+	$('<div />')
+		.html('<b>Failure to follow the above rules will result in a ban</b>')
+		.css('margin-bottom', '20px')
 		.appendTo($tos);
 
 	$('<input />') // AGREE
@@ -814,22 +832,41 @@ function showReportsToAdmin(album) {
 			.append($delallbl)
 			.appendTo( $('#report') );
 
-		var aban = $('<a />')
+		// Temporary ban
+		var atban = $('<a />')
+			.html('temporarily ban ' + album.user)
+			.addClass('orange bold underline')
+			.attr('href', '')
+			.attr('user', album.user)
+			.click( function() {
+				banUser($(this).attr('user'), 'temporary');
+				return false;
+			});
+		var stban = $('<span />')
+			.attr('id', 'ban_status_temporary')
+			.css('padding-left', '5px');
+		$('<div />')
+			.addClass('space')
+			.append(atban)
+			.append(stban)
+			.appendTo( $('#report') );
+		// Permanent ban
+		var apban = $('<a />')
 			.html('permanently ban ' + album.user)
 			.addClass('red bold underline')
 			.attr('href', '')
 			.attr('user', album.user)
 			.click( function() {
-				banUser($(this).attr('user'));
+				banUser($(this).attr('user'), 'permanent');
 				return false;
 			});
-		var sban = $('<span />')
-			.attr('id', 'ban_status')
+		var spban = $('<span />')
+			.attr('id', 'ban_status_permanent')
 			.css('padding-left', '5px');
 		$('<div />')
 			.addClass('space')
-			.append(aban)
-			.append(sban)
+			.append(apban)
+			.append(spban)
 			.appendTo( $('#report') );
 	} else {
 		$('<div />')
@@ -948,7 +985,7 @@ function deleteAllAlbums(user, blacklist) {
 	return false;
 }
 
-function banUser(user) {
+function banUser(user, length) {
 	var reason = prompt("enter reason why user is being banned", "enter reason here");
 	if (reason == null || reason == '') {
 		return;
@@ -967,10 +1004,10 @@ function banUser(user) {
 				.css('border', 'none')
 				.css('padding-right', '5px')
 		);
-	$.getJSON('view.cgi?ban_user=' + user + '&reason=' + reason)
+	$.getJSON('view.cgi?ban_user=' + user + '&reason=' + reason + '&length=' + length)
 		.fail( adminJsonFailHandler )
 		.done( function(json) { 
-			adminRequestHandler(json, $('#ban_status'))
+			adminRequestHandler(json, $('#ban_status_' + length))
 		});
 	return false;
 }
@@ -1028,6 +1065,13 @@ $.fn.imagesLoaded = function(callback, fireOne) {
 		});
 }
 
-$(document).ready( function() {
-	init();
-});
+///////////////////
+// MISC
+function truncate(text, split_size) { // Truncates text
+	if (text.length > (split_size * 2) + 3) {
+		text = text.substr(0, split_size) + "..." + text.substr(text.length-split_size);
+	}
+	return text;
+}
+
+$(document).ready(init);

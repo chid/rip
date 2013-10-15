@@ -29,6 +29,7 @@ input::selection {
 .pre       { white-space: pre; }
 .pointer   { cursor: pointer; }
 .hidden    { visibility: hidden; }
+.red       { color :#ff0000; }
 
 
 /* ID-specific traits */
@@ -357,7 +358,7 @@ div.date {
 }
 
 .download_arrow {
-	background-image: url(download.png);
+	background-image: url(../images/download.png);
 	background-repeat: no-repeat;
 	background-size: 90% auto;
 	background-position: center center;
@@ -418,14 +419,14 @@ a.bottom:hover {
 }
 
 div.donate_button input {
-	background: transparent url(donate.png);
+	background: transparent url(../images/donate.png);
 	cursor: pointer;
 	width:  92px;
 	height: 26px;
 	border: none;
 }
 div.donate_button input:hover {
-	background: transparent url(donate_color.png);
+	background: transparent url(../images/donate_color.png);
 }
 
 div.warning {
@@ -442,4 +443,16 @@ div.warning {
 	background-color: #555;
 	padding: 20px;
 	padding-bottom: 10px;
+}
+
+#noscript {
+	font-size: 2.0em;
+	position: fixed;
+	top: 20%;
+	left: 10%;
+	background-color: #b33;
+	color: #eee;
+	padding: 30px;
+	padding-top: 0px;
+	border-radius: 20px;
 }

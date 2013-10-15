@@ -20,20 +20,21 @@ class imgur(basesite):
 		#   "account": user.imgur.com/album_name
 		#   "subreddit": imgur.com/r/subreddit
 		self.album_type = None 
+		self.debug('url before: %s' % url)
 		if not 'http://imgur.com' in url and not '.imgur.com' in url:
 			raise Exception('')
 		if '/m.imgur.com/' in url: url = url.replace('/m.imgur.com/', '/imgur.com/')
 		if      '.imgur.com'    in url and \
-				not 'i.imgur.com'   in url and \
-				not 'www.imgur.com' in url:
+				not url.startswith('i.imgur.com') and \
+				not url.startswith('www.imgur.com'):
+			url = url.replace('https://', 'http://').replace('http://', '')
 			# Domain-level
-			url = url.replace('http://', '').replace('https://', '')
 			while url.endswith('/'): url = url[:-1]
 			urls = url.split('/')
-			url = '/'.join(urls[0:1]) # Only the domain & first subdir
+			url = '/'.join(urls[0:2]) # Only the domain & first subdir
 			if '?' in url: url = url[:url.find('?')]
 			if '#' in url: url = url[:url.find('#')]
-			return 'http://%s' % url
+			url = 'http://%s' % url
 		elif 'imgur.com/r/' in url:
 			# Subreddit
 			sub = url[url.find('imgur.com/r/')+len('imgur.com/r/'):]
@@ -49,7 +50,7 @@ class imgur(basesite):
 				return 'http://imgur.com/r/%s/%s/all' % (splits[0], splits[1])
 			if splits[2] not in ['day', 'month', 'year', 'all']:
 				raise Exception('Unexpected imgur subreddit sort time: %s' % splits[2])
-			return 'http://imgur.com/r/%s/%s/%s' % (splits[0], splits[1], splits[2])
+			url = 'http://imgur.com/r/%s/%s/%s' % (splits[0], splits[1], splits[2])
 			
 		elif not '/a/' in url:
 			raise Exception("Not a valid imgur album")
@@ -59,12 +60,13 @@ class imgur(basesite):
 			while url.count('/') > 2: url = url[:url.rfind('/')]
 			if '?' in url: url = url[:url.find('?')]
 			if '#' in url: url = url[:url.find('#')]
-			return 'http://%s' % url
+			url = 'http://%s' % url
+		self.debug('sanitized url: %s' % url)
+		return url
 
 	""" Discover directory path based on URL """
 	def get_dir(self, url):
 		u = self.url
-		u = u.replace('/all', '')
 		if 'imgur.com/r/' in u:
 			# Subreddit
 			self.album_type = 'subreddit'
@@ -96,16 +98,25 @@ class imgur(basesite):
 
 	def download(self):
 		self.init_dir()
-		self.max_images = 5000
-		if  self.album_type == 'direct' or \
-				self.album_type == 'domain':
+		self.debug('album type: %s' % self.album_type)
+		if  self.album_type == 'direct':
 			# Single album
+			self.max_images = 5000
 			self.download_album_json(self.url)
+		elif self.album_type == 'domain':
+			self.max_images = 5000
+			if self.url.endswith('/all'):
+				self.download_account_images(self.url)
+			else:
+				# Single album
+				self.download_album_json(self.url)
+
 		elif self.album_type == 'subreddit':
 			# Subreddit
 			self.download_subreddit(self.url)
 		else:
 			# Account-level album
+			self.max_images = 5000
 			self.download_account(self.url)
 		self.wait_for_threads()
 	
@@ -145,15 +156,12 @@ class imgur(basesite):
 			link = self.get_highest_res('http://i.%s' % link)
 			# Download every image
 			# Uses superclass threaded download method
-			if self.urls_only:
-				self.add_url(index + 1, link, total=len(links))
-			else:
-				fname = link[link.rfind('/')+1:]
-				if '?' in fname: fname = fname[:fname.find('?')]
-				if '#' in fname: fname = fname[:fname.find('#')]
-				saveas = '%s%03d_%s' % (postid, index + 1, fname)
-				self.download_image(link, index + 1, total=len(links), saveas=saveas)
-				if self.hit_image_limit(): break
+			fname = link[link.rfind('/')+1:]
+			if '?' in fname: fname = fname[:fname.find('?')]
+			if '#' in fname: fname = fname[:fname.find('#')]
+			saveas = '%s%03d_%s' % (postid, index + 1, fname)
+			self.download_image(link, index + 1, total=len(links), saveas=saveas)
+			if self.hit_image_limit(): break
 	
 	''' Escape text '''
 	def safe_text(self, text):
@@ -201,15 +209,12 @@ class imgur(basesite):
 			caption = self.safe_text(meta.get('caption', ''))
 			if title != '' or caption != '':
 				captions.append( (url, title, caption) )
-			if self.urls_only:
-				self.add_url(index + 1, url, total=total)
-			else:
-				fname = url[url.rfind('/')+1:]
-				if '?' in fname: fname = fname[:fname.find('?')]
-				if '#' in fname: fname = fname[:fname.find('#')]
-				saveas = '%s%03d_%s' % (postid, index + 1, fname)
-				self.download_image(url, index + 1, total=total, saveas=saveas)
-				if self.hit_image_limit(): break
+			fname = url[url.rfind('/')+1:]
+			if '?' in fname: fname = fname[:fname.find('?')]
+			if '#' in fname: fname = fname[:fname.find('#')]
+			saveas = '%s%03d_%s' % (postid, index + 1, fname)
+			self.download_image(url, index + 1, total=total, saveas=saveas)
+			if self.hit_image_limit(): break
 		if header != '' or captions != []:
 			f = open('%s/%scaptions.txt' % (self.working_dir, postid), 'w')
 			if header != '':
@@ -248,11 +253,8 @@ class imgur(basesite):
 				# Download every image
 				# Uses superclass threaded download method
 				index += 1
-				if self.urls_only:
-					self.add_url(index, link, total=total)
-				else:
-					self.download_image(link, index, total=total) 
-					if self.hit_image_limit(): break
+				self.download_image(link, index, total=total) 
+				if self.hit_image_limit(): break
 			if self.hit_image_limit(): break
 			page += 1
 	
@@ -312,3 +314,26 @@ class imgur(basesite):
 		
 		# URL now contains extension
 		return self.get_highest_res(url)
+	
+	def download_account_images(self, url):
+		url = url.replace('/all', '')
+		page = total = index = 0
+		while True:
+			page += 1
+			next_page = '%s/ajax/images?sort=0&order=1&album=0&page=%d&perPage=60' % (url, page)
+			self.debug('loading %s' % next_page)
+			r = self.web.get(next_page)
+			try:
+				json = loads(r)
+				data = json['data']
+			except Exception, e:
+				# Unable to load json
+				self.wait_for_threads()
+				raise Exception('unable to load JSON, %s' % str(e))
+			if total == 0 and 'count' in data:
+				total = data['count']
+			for image in data['images']:
+				index += 1
+				self.download_image('http://i.imgur.com/%s%s' % (image['hash'], image['ext']), index, total=total)
+			if index >= total or self.hit_image_limit(): break
+		self.wait_for_threads()

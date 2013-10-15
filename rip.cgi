@@ -1,5 +1,8 @@
 #!/usr/bin/python
 
+MAX_ALBUMS_PER_USER = 20
+MAX_IMAGES_PER_CONTRIBUTOR = 1000
+
 import cgitb; cgitb.enable() # for debugging
 import cgi # for getting query keys/values
 
@@ -17,7 +20,8 @@ from sites.site_imagearn    import    imagearn
 from sites.site_imagebam    import    imagebam
 from sites.site_imagefap    import    imagefap
 from sites.site_imgur       import       imgur
-from sites.site_webstagram  import   instagram
+#from sites.site_webstagram  import   instagram
+from sites.site_statigram   import   instagram
 from sites.site_photobucket import photobucket
 from sites.site_tumblr      import      tumblr
 from sites.site_twitter     import     twitter
@@ -69,19 +73,13 @@ def main():
 			'url'   in keys:
 		
 		cached    = True # Default to cached
-		urls_only = False
 		if 'cached' in keys and keys['cached'] == 'false':
 			cached = False
-		if 'urls_only' in keys and keys['urls_only'] == 'true':
-			urls_only = True
-		rip(keys['url'], cached, urls_only)
+		rip(keys['url'], cached)
 		
 	elif 'check' in keys and \
 			 'url'   in keys:
-		urls_only = False
-		if 'urls_only' in keys and keys['urls_only'] == 'true':
-			urls_only = True
-		check(keys['url'], urls_only)
+		check(keys['url'])
 		
 	elif 'recent' in keys:
 		lines = 10
@@ -91,18 +89,20 @@ def main():
 	elif 'byuser' in keys:
 		ip = keys['byuser']
 		if ip == 'me': ip = environ.get('REMOTE_ADDR', '127.0.0.1')
-		albums_by_ip(ip)
+		print dumps({ 'albums' : albums_by_ip(ip) })
 	
 	else:
 		print_error('invalid request')
 
 """ Gets ripper, checks for existing rip, rips and zips as needed. """
-def rip(url, cached, urls_only):
-	url = unquote(url.strip()).replace(' ', '%20')
-	
+def rip(url, cached):
+	url = unquote(url.strip()).replace(' ', '%20').replace('https://', 'http://')
+
+	if not passes_pre_rip_check(url): return
+
 	try:
 		# Get domain-specific ripper for URL
-		ripper = get_ripper(url, urls_only)
+		ripper = get_ripper(url)
 	except Exception, e:
 		print_error(str(e))
 		return
@@ -145,13 +145,9 @@ def rip(url, cached, urls_only):
 				response['image_count'] = image_count
 			print dumps( response )
 			return
-
-	'''
-	if ripper.is_downloading():
-		print_error("album rip is in progress. check back later")
-		return
-	'''
 	
+	if is_contributor():
+		ripper.max_images = MAX_IMAGES_PER_CONTRIBUTOR
 	# Rip it
 	try:
 		ripper.download()
@@ -192,12 +188,11 @@ def rip(url, cached, urls_only):
 	except: pass
 
 	# Mark album as completed
-	if not urls_only:
-		f = open('%s%scomplete.txt' % (ripper.working_dir, sep), 'w')
-		f.write('\n')
-		f.close()
-		response['album'] = ripper.working_dir.replace(' ', '%20').replace('%20', '%2520')
-		response['url']   = './%s' % ripper.working_dir.replace('rips/', 'rips/#')
+	f = open('%s%scomplete.txt' % (ripper.working_dir, sep), 'w')
+	f.write('\n')
+	f.close()
+	response['album'] = ripper.working_dir.replace(' ', '%20').replace('%20', '%2520')
+	response['url']   = './%s' % ripper.working_dir.replace('rips/', 'rips/#')
 	
 	response['zip']  = ripper.existing_zip_path().replace(' ', '%20').replace('%20', '%2520')
 	response['size'] = ripper.get_size(ripper.existing_zip_path())
@@ -208,15 +203,51 @@ def rip(url, cached, urls_only):
 	# Print it
 	print dumps(response)
 
+""" Checks if current user is a 'contributor' """
+def is_contributor():
+	if not path.exists('contributors.txt'): return False
+	cookies = get_cookies()
+	if not 'rip_contributor_password' in cookies: return False
+	f = open('contributors.txt', 'r')
+	contributors = f.read().split('\n')
+	f.close()
+	while '' in contributors: contributors.remove('')
+	return cookies['rip_contributor_password'] in contributors
+
+""" Returns dict of requester's cookies """
+def get_cookies():
+	if not 'HTTP_COOKIE' in environ: return {}
+	cookies = {}
+	txt = environ['HTTP_COOKIE']
+	for line in txt.split(';'):
+		if not '=' in line: continue
+		pairs = line.strip().split('=')
+		cookies[pairs[0]] = pairs[1]
+	return cookies
+
+""" Ensures url can be ripped by user """
+def passes_pre_rip_check(url):
+	# Check if site is in unsupported list
+	if not is_supported(url):
+		print_error('site is not supported; will not be supported')
+		return False
+	# Check if user passed max albums allowed
+	if not is_contributor():
+		ip = environ.get('REMOTE_ADDR', '127.0.0.1')
+		if len(albums_by_ip(ip)) >= MAX_ALBUMS_PER_USER:
+			print_error('users are only allowed to rip %d albums at a time' % MAX_ALBUMS_PER_USER)
+			return False
+	return True
 
 """
 	Checks status of rip. Returns zip/size if finished, otherwise
 	returns the last log line from the rip.
 """
-def check(url, urls_only):
+def check(url):
 	url = unquote(url).replace(' ', '%20')
+
 	try:
-		ripper = get_ripper(url, urls_only)
+		ripper = get_ripper(url)
 	except Exception, e:
 		print_error(str(e))
 		return
@@ -248,7 +279,7 @@ def check(url, urls_only):
 			} )
 
 """ Returns an appropriate ripper for a URL, or throws exception """
-def get_ripper(url, urls_only):
+def get_ripper(url):
 	sites = [        \
 			deviantart,  \
 			flickr,      \
@@ -290,7 +321,7 @@ def get_ripper(url, urls_only):
 			seenive]
 	for site in sites:
 		try:
-			ripper = site(url, urls_only)
+			ripper = site(url)
 			return ripper
 		except Exception, e:
 			# Rippers that aren't made for the URL throw blank Exception
@@ -335,7 +366,7 @@ def recent(lines):
 	result = []
 	for rec in recents:
 		d = {}
-		try: ripper = get_ripper(rec, False)
+		try: ripper = get_ripper(rec)
 		except: continue
 		d['url'] = rec
 		d['view_url'] = ripper.working_dir.replace('rips/', 'rips/#')
@@ -350,16 +381,16 @@ def tail(f, lines=1, _buffer=4098):
 	lines_found = []
 	block_counter = -1
 	while len(lines_found) < lines:
-			try:
-					f.seek(block_counter * _buffer, SEEK_END)
-			except IOError:  # either file is too small, or too many lines requested
-					f.seek(0)
-					lines_found = f.readlines()
-					break
+		try:
+			f.seek(block_counter * _buffer, SEEK_END)
+		except IOError, e:  # either file is too small, or too many lines requested
+			f.seek(0)
 			lines_found = f.readlines()
-			if len(lines_found) > lines:
-					break
-			block_counter -= 1
+			break
+		lines_found = f.readlines()
+		if len(lines_found) > lines:
+			break
+		block_counter -= 1
 	result = [word.strip() for word in lines_found[-lines:]]
 	result.reverse()
 	return result
@@ -402,14 +433,20 @@ def albums_by_ip(ip):
 				jsonalbum['url']   = url
 					
 			albums.append(jsonalbum)
-	print dumps( {
-		'albums' : albums
-		} )
+	return albums
+
+def is_supported(url):
+	if not path.exists('unsupported.txt'): return True
+	for line in open('unsupported.txt', 'r'):
+		line = line.strip()
+		if line.lower() in url.lower():
+			return False
+	return True
 
 """ Entry point. Print leading/trailing characters, executes main() """
 if __name__ == '__main__':
 	print "Content-Type: application/json"
-	print "Keep-Alive: timeout=300"
+	print "Keep-Alive: timeout=900"
 	print "Connection: Keep-Alive"
 	print ""
 	stdout.flush()
