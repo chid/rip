@@ -421,6 +421,7 @@ function ripRequestHandler(json) { // Handles rip requests (both 'start' and 'ch
 			setProgress(num / denom);
 		}
 		if (log !== '') {
+			log = truncate(log, 18);
 			$statbar.empty();
 			$('<div />')
 				.append( $('<img />')
@@ -647,7 +648,7 @@ function over18() {
 		
 	$('<div />')
 		.html(
-			'This website may contain adult content which is not appropriate for persons over the age of 18.' +
+			'This website may contain adult content which is not appropriate for persons under the age of 18.' +
 			'<p>' +
 			'By entering this site, you agree to the following terms of use:')
 		.appendTo($tos);
