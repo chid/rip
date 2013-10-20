@@ -326,6 +326,8 @@ def get_images_for_album(album, start, count, thumbs=False):
 			if dstart >= start and (dcount < count or count == -1):
 				image = '%s%s%s' % (roots, sep, f)
 				image = image.replace('%', '%25')
+				image = image.replace('\\', '/')
+				image = image.replace('/thumbs/', '/')
 				images.append( { 
 						'image' : image, 
 						'thumb' : get_thumb(image) 
@@ -635,6 +637,7 @@ def get_keys(): # Retrieve key/value pairs from query, puts in dict
 	return keys
 
 def get_thumb(img): # Get thumbnail based on image, or 'nothumb.png' if not found
+	img= img.replace("\\",sep)  # silly windows
 	fs = img.split(sep)
 	fs.insert(-1, 'thumbs')
 	f = sep.join(fs)
