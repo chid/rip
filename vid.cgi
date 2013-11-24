@@ -74,6 +74,7 @@ def get_url(siteurl):
 	if 'cliphunter.com'   in siteurl: return get_site_cliphunter(siteurl)
 	if 'spankwire.com'    in siteurl: return get_site_spankwire(siteurl)
 	if 'kinkylicious.com' in siteurl: return get_site_kinkylicious(siteurl)
+	if 'youtube.com' 	  in siteurl: return get_site_youtube(siteurl)
 
 	site_key = None
 	for key in sites.keys():
@@ -91,6 +92,14 @@ def get_url(siteurl):
 		sites[site_key]['unquote'] -= 1
 		url = unquote(url)
 	return url
+
+def get_site_youtube(siteurl):
+	import sys
+  	sys.path.append('youtube-dl')
+	import youtube_dl
+	yt = youtube_dl.YoutubeDL(param)	
+	yt.add_default_info_extractors()	
+	return yt.extract_info(siteurl)['entries'][0]['url']
 
 def get_site_beeg(siteurl):
 	r = web.get(siteurl)
