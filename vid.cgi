@@ -37,7 +37,7 @@ def get_video_url(siteurl):
 	})
 
 def get_url(siteurl):
-	is_supported(siteurl)
+	# is_supported(siteurl)
 	sites = {
 			'videobam.com/' :  { 'begend' : ['"',      '"'],        'unquote' : 1 },
 			'xhamster.com/' :  { 'begend' : ['"',      '"'],        'unquote' : 1 },
@@ -406,10 +406,10 @@ def get_site_kinkylicious(siteurl):
 	return 'http://kinkylicious.com/vdata/%s.flv' % vid
 
 
-def is_supported(url):
-	for not_supported in ['youtube.com/']:
-		if not_supported in url:
-			raise Exception('%s is not supported' % not_supported)
+# def is_supported(url):
+# 	for not_supported in ['youtube.com/']:
+# 		if not_supported in url:
+# 			raise Exception('%s is not supported' % not_supported)
 
 def get_deepest_ind(source, ext_inds):
 	deep_ind = 0
