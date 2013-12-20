@@ -108,7 +108,7 @@ class flickr(basesite):
 		pid = url[:url.rfind('/in/')]
 		pid = pid[pid.rfind('/')+1:]
 		# Use 'K' for largest possible resolution
-		larger = url.replace('/in/', '/sizes/k/in/')
+		larger = url.replace('/in/', '/sizes/o/in/')
 		# Flickr will redirect to next-highest resolution (?)
 		# TODO Confirm if this is the case!
 		larger = self.web.unshorten(larger) # Gets redirected URL
